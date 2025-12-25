@@ -1,0 +1,403 @@
+{
+  "name": "NanoBananaPro-Image-Edit",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Nano Banana Pro Image Edit",
+        "formDescription": "Edit images based on text prompts using Gemini Nano-Banana Pro model via MuleRun API",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Prompt",
+              "fieldType": "textarea",
+              "placeholder": "Make a photo of the man driving the car down the California coastline",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Image",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".jpg,.jpeg,.png,.webp",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Second Image (Optional)",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".jpg,.jpeg,.png,.webp"
+            },
+            {
+              "fieldLabel": "Aspect Ratio",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "1:1"
+                  },
+                  {
+                    "option": "2:3"
+                  },
+                  {
+                    "option": "3:2"
+                  },
+                  {
+                    "option": "3:4"
+                  },
+                  {
+                    "option": "4:3"
+                  },
+                  {
+                    "option": "4:5"
+                  },
+                  {
+                    "option": "5:4"
+                  },
+                  {
+                    "option": "9:16"
+                  },
+                  {
+                    "option": "16:9"
+                  },
+                  {
+                    "option": "21:9"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Resolution",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "1K"
+                  },
+                  {
+                    "option": "2K"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -672,
+        -128
+      ],
+      "id": "eb85bc11-714a-4552-921e-739a149aab47",
+      "name": "Form Input",
+      "webhookId": "nano-banana-pro-edit"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert uploaded images to Base64 data URLs\nconst images = [];\n\n// Get binary data keys\nconst binaryKeys = Object.keys($input.item.binary || {});\n\nfor (const key of binaryKeys) {\n  const binary = $input.item.binary[key];\n  if (binary && binary.data) {\n    const mimeType = binary.mimeType || 'image/png';\n    const base64DataUrl = `data:${mimeType};base64,${binary.data}`;\n    images.push(base64DataUrl);\n  }\n}\n\nreturn {\n  prompt: $input.item.json['Prompt'],\n  images: images,\n  aspect_ratio: $input.item.json['Aspect Ratio'],\n  resolution: $input.item.json['Resolution']\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        -128
+      ],
+      "id": "cbd0f040-ab96-4042-9c61-96b0f90e9a61",
+      "name": "Convert Images to Base64"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mulerun.com/vendors/google/v1/nano-banana-pro/edit",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        -128
+      ],
+      "id": "fd912df7-4007-4500-ad37-e37b8d4822fd",
+      "name": "Submit Edit Task",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "r02oNwvjanFeQout",
+          "name": "Header Auth account"
+        },
+        "httpBearerAuth": {
+          "id": "huAB8Nb7XGn4EpqT",
+          "name": "MuleRun Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -16,
+        -128
+      ],
+      "id": "aef520f0-b0ad-402d-b3fc-3124d9c85001",
+      "name": "Wait 5s",
+      "webhookId": "f674952f-1d3a-4844-b68f-147c9b5919c3"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mulerun.com/vendors/google/v1/nano-banana-pro/edit/{{ $('Submit Edit Task').item.json.task_info.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        -128
+      ],
+      "id": "150dde81-8599-4b3d-9eea-ec83ca545a2d",
+      "name": "Poll Task Status",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "r02oNwvjanFeQout",
+          "name": "Header Auth account"
+        },
+        "httpBearerAuth": {
+          "id": "huAB8Nb7XGn4EpqT",
+          "name": "MuleRun Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_info.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        -128
+      ],
+      "id": "f78580d1-fd93-4f8e-9b23-eb778ff797e6",
+      "name": "Is Completed?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_info.status }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        96
+      ],
+      "id": "c02c840d-7321-4e9e-aed6-21b5606c3f0a",
+      "name": "Is Failed?"
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        272
+      ],
+      "id": "c57daabd-e5bb-404f-918a-04813a2ea258",
+      "name": "Wait 3s Retry",
+      "webhookId": "848e6e48-aad5-4ac1-8b60-83c91be8cadd"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.images[0] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        -128
+      ],
+      "id": "5f45aa8c-a27c-42f5-9610-8ec6d0d065d9",
+      "name": "Download Image"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format error output with proper JSON handling\nconst errorDetail = $input.item.json.task_info?.error?.detail || 'Task failed';\n\nreturn {\n  status: 'failed',\n  error: errorDetail,\n  final_output: `Edit failed: ${errorDetail}`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        96
+      ],
+      "id": "eed2dbcd-da56-4487-87c4-5799b6a7c3a7",
+      "name": "Format Error Output"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Form Input": {
+      "main": [
+        [
+          {
+            "node": "Convert Images to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Images to Base64": {
+      "main": [
+        [
+          {
+            "node": "Submit Edit Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Edit Task": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5s": {
+      "main": [
+        [
+          {
+            "node": "Poll Task Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Task Status": {
+      "main": [
+        [
+          {
+            "node": "Is Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Completed?": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Failed?": {
+      "main": [
+        [
+          {
+            "node": "Format Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 3s Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3s Retry": {
+      "main": [
+        [
+          {
+            "node": "Poll Task Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fcf35924-8682-465c-b967-b5c92f4b091c",
+  "meta": {
+    "instanceId": "ad8bd1438d783b86c795879f4650f249bbb6ac0f3e6c226aa2e7261ea11127a5"
+  },
+  "id": "a9AEHtt6XFJKXt5K",
+  "tags": []
+}
