@@ -1,0 +1,403 @@
+{
+  "name": "Veo3_1-Video-Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Veo3_1 Video Generation",
+        "formDescription": "Generate videos using Google Veo 3.1 models with text, images, or reference images via MuleRun API",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Prompt",
+              "fieldType": "textarea",
+              "placeholder": "A serene sunset over a calm ocean, with gentle waves lapping against the shore",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Negative Prompt (Optional)",
+              "fieldType": "textarea",
+              "placeholder": "blurry, low quality, pixelated"
+            },
+            {
+              "fieldLabel": "First Frame Image (Optional)",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".jpg,.jpeg,.png,.webp,.bmp"
+            },
+            {
+              "fieldLabel": "Last Frame Image (Optional)",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".jpg,.jpeg,.png,.webp,.bmp"
+            },
+            {
+              "fieldLabel": "Reference Image 1",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".jpg,.jpeg,.png,.webp,.bmp"
+            },
+            {
+              "fieldLabel": "Reference Image 2",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".jpg,.jpeg,.png,.webp,.bmp"
+            },
+            {
+              "fieldLabel": "Reference Image 3",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".jpg,.jpeg,.png,.webp,.bmp"
+            },
+            {
+              "fieldLabel": "Model",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "veo-3.1"
+                  },
+                  {
+                    "option": "veo-3.1-fast"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Aspect Ratio",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "16:9"
+                  },
+                  {
+                    "option": "9:16"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -2464,
+        208
+      ],
+      "id": "9564b3f1-fdeb-4c1f-91cd-ac6794629c22",
+      "name": "Form Input",
+      "webhookId": "Veo3_1-video-generation"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helper function to convert binary to base64 data URL\nfunction binaryToBase64(binary) {\n  if (binary && binary.data) {\n    const mimeType = binary.mimeType || 'image/png';\n    return `data:${mimeType};base64,${binary.data}`;\n  }\n  return null;\n}\n\n// Build request body\nconst body = {\n  prompt: $input.item.json['Prompt'],\n  model: $input.item.json['Model'],\n  aspect_ratio: $input.item.json['Aspect Ratio'],\n  resolution: '1080p',\n  duration: '8'\n};\n\n// Add optional negative_prompt\nconst negPrompt = $input.item.json['Negative Prompt (Optional)'];\nif (negPrompt && negPrompt.trim()) {\n  body.negative_prompt = negPrompt.trim();\n}\n\n// Process binary data for images\nconst binary = $input.item.binary || {};\n\n// Map form field labels to binary keys (n8n uses sanitized field names)\n// First Frame Image\nif (binary['First_Frame_Image__Optional_']) {\n  const base64 = binaryToBase64(binary['First_Frame_Image__Optional_']);\n  if (base64) body.image = base64;\n}\n\n// Last Frame Image\nif (binary['Last_Frame_Image__Optional_']) {\n  const base64 = binaryToBase64(binary['Last_Frame_Image__Optional_']);\n  if (base64) body.last_frame = base64;\n}\n\n// Reference Images (up to 3)\nconst refImages = [];\nconst refKeys = [\n  'Reference_Image_1',\n  'Reference_Image_2',\n  'Reference_Image_3'\n];\n\nfor (const key of refKeys) {\n  if (binary[key]) {\n    const base64 = binaryToBase64(binary[key]);\n    if (base64) refImages.push(base64);\n  }\n}\n\nif (refImages.length > 0) {\n  body.reference_images = refImages;\n}\n\nreturn body;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2240,
+        208
+      ],
+      "id": "62a4b1c3-3567-4c66-bf52-a6b802b3e65c",
+      "name": "Prepare Request Body"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mulerun.com/vendors/google/v1/veo/generation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2016,
+        208
+      ],
+      "id": "adca8bb3-3124-4971-a0f6-898fd361f659",
+      "name": "Submit Generation Task",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "r02oNwvjanFeQout",
+          "name": "Header Auth account"
+        },
+        "httpBearerAuth": {
+          "id": "huAB8Nb7XGn4EpqT",
+          "name": "MuleRun Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1792,
+        208
+      ],
+      "id": "07bd8846-7e66-483b-8d84-5a0d20660c45",
+      "name": "Wait 30s",
+      "webhookId": "8927717a-fff0-40d0-ad2f-061fa7b5f186"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.mulerun.com/vendors/google/v1/veo/generation/{{ $('Submit Generation Task').item.json.task_info.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1584,
+        208
+      ],
+      "id": "728e83ce-9616-4893-9b16-fa7a7a90b602",
+      "name": "Poll Task Status",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "r02oNwvjanFeQout",
+          "name": "Header Auth account"
+        },
+        "httpBearerAuth": {
+          "id": "huAB8Nb7XGn4EpqT",
+          "name": "MuleRun Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_info.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1360,
+        208
+      ],
+      "id": "8995d697-181b-44f6-bdbc-75faa98f43cd",
+      "name": "Is Completed?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.task_info.status }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1088,
+        432
+      ],
+      "id": "f3e43b58-6544-400c-bce3-0d17ece1fca3",
+      "name": "Is Failed?"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -864,
+        624
+      ],
+      "id": "b177da7a-8d36-455b-8b27-3a31529afc7e",
+      "name": "Wait 15s Retry",
+      "webhookId": "d4ba2d7d-1386-47b6-8048-009c4f07af72"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.videos[0] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1088,
+        192
+      ],
+      "id": "be6ec10b-389c-4510-86d4-9f8e1c96865b",
+      "name": "Download Video"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format error output with proper JSON handling\nconst errorDetail = $input.item.json.task_info?.error?.detail || 'Task failed';\n\nreturn {\n  status: 'failed',\n  error: errorDetail,\n  final_output: `Video generation failed: ${errorDetail}`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        432
+      ],
+      "id": "b80d0ee8-d729-48a4-a916-53472dd53f45",
+      "name": "Format Error Output"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Form Input": {
+      "main": [
+        [
+          {
+            "node": "Prepare Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Request Body": {
+      "main": [
+        [
+          {
+            "node": "Submit Generation Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Generation Task": {
+      "main": [
+        [
+          {
+            "node": "Wait 30s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30s": {
+      "main": [
+        [
+          {
+            "node": "Poll Task Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Task Status": {
+      "main": [
+        [
+          {
+            "node": "Is Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Completed?": {
+      "main": [
+        [
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Failed?": {
+      "main": [
+        [
+          {
+            "node": "Format Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 15s Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 15s Retry": {
+      "main": [
+        [
+          {
+            "node": "Poll Task Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d3f05a00-fe98-431b-9992-1221aa694af5",
+  "meta": {
+    "instanceId": "ad8bd1438d783b86c795879f4650f249bbb6ac0f3e6c226aa2e7261ea11127a5"
+  },
+  "id": "hoTTkSMwcsnYwx3t",
+  "tags": []
+}
